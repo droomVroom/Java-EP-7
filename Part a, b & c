@@ -1,0 +1,363 @@
+//Part a
+CREATE TABLE demo_table (
+    id INT PRIMARY KEY,
+    name VARCHAR(50)
+);
+INSERT INTO demo_table VALUES (1, 'Alice'), (2, 'Bob'), (3, 'Charlie');
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
+
+public class ConnectAndFetch {
+    public static void main(String[] args) {
+        String url = "jdbc:mysql://localhost:3306/your_db"; 
+        String username = "root"; 
+        String password = "your_password";
+
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            Connection conn = DriverManager.getConnection(url, username, password);
+
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery("SELECT * FROM demo_table");
+
+            while (rs.next()) {
+                int id = rs.getInt("id");
+                String name = rs.getString("name");
+                System.out.println("ID: " + id + ", Name: " + name);
+            }
+
+            rs.close();
+            stmt.close();
+            conn.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+
+//Part b
+//Product Model
+public class Product {
+    private int id;
+    private String name;
+    private double price;
+
+    public Product() { }
+    public Product(int id, String name, double price) {
+        this.id = id;
+        this.name = name;
+        this.price = price;
+    }
+
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public double getPrice() { return price; }
+    public void setPrice(double price) { this.price = price; }
+
+    @Override
+    public String toString() {
+        return "Product{id=" + id + ", name='" + name + "', price=" + price + "}";
+    }
+}
+
+//JDBC Utility Class
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
+public class DBUtil {
+    private static final String JDBC_URL = "jdbc:mysql://localhost:3306/your_db";
+    private static final String USER = "root";
+    private static final String PASS = "your_password";
+
+    public static Connection getConnection() throws SQLException {
+        return DriverManager.getConnection(JDBC_URL, USER, PASS);
+    }
+}
+
+//ProductDAO Class (CRUD Methods)
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class ProductDAO {
+
+    public void addProduct(Product product) throws SQLException {
+        String sql = "INSERT INTO product (id, name, price) VALUES (?, ?, ?)";
+        try (Connection con = DBUtil.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, product.getId());
+            ps.setString(2, product.getName());
+            ps.setDouble(3, product.getPrice());
+            ps.executeUpdate();
+        }
+    }
+
+    public List<Product> getAllProducts() throws SQLException {
+        List<Product> products = new ArrayList<>();
+        String sql = "SELECT * FROM product";
+        try (Connection con = DBUtil.getConnection();
+             Statement st = con.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) {
+                products.add(new Product(rs.getInt("id"),
+                                        rs.getString("name"),
+                                        rs.getDouble("price")));
+            }
+        }
+        return products;
+    }
+
+    public Product getProductById(int id) throws SQLException {
+        String sql = "SELECT * FROM product WHERE id = ?";
+        try (Connection con = DBUtil.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new Product(rs.getInt("id"),
+                                      rs.getString("name"),
+                                      rs.getDouble("price"));
+                }
+            }
+        }
+        return null;
+    }
+
+    public void updateProduct(Product product) throws SQLException {
+        String sql = "UPDATE product SET name = ?, price = ? WHERE id = ?";
+        try (Connection con = DBUtil.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, product.getName());
+            ps.setDouble(2, product.getPrice());
+            ps.setInt(3, product.getId());
+            ps.executeUpdate();
+        }
+    }
+
+    public void deleteProduct(int id) throws SQLException {
+        String sql = "DELETE FROM product WHERE id = ?";
+        try (Connection con = DBUtil.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            ps.executeUpdate();
+        }
+    }
+}
+
+// ProductApp (Main Console UI)
+import java.util.Scanner;
+import java.util.List;
+
+public class ProductApp {
+    public static void main(String[] args) throws Exception {
+        ProductDAO dao = new ProductDAO();
+        Scanner sc = new Scanner(System.in);
+
+        while (true) {
+            System.out.println("1. Add | 2. View All | 3. View By Id | 4. Update | 5. Delete | 6. Exit");
+            int choice = sc.nextInt();
+
+            switch (choice) {
+                case 1:
+                    System.out.print("Id: "); int id = sc.nextInt();
+                    System.out.print("Name: "); sc.nextLine(); String name = sc.nextLine();
+                    System.out.print("Price: "); double price = sc.nextDouble();
+                    dao.addProduct(new Product(id, name, price));
+                    break;
+                case 2:
+                    List<Product> list = dao.getAllProducts();
+                    for (Product p : list) System.out.println(p);
+                    break;
+                case 3:
+                    System.out.print("Id: "); int pid = sc.nextInt();
+                    Product p = dao.getProductById(pid);
+                    System.out.println(p != null ? p : "Not found");
+                    break;
+                case 4:
+                    System.out.print("Id: "); int uid = sc.nextInt();
+                    System.out.print("New Name: "); sc.nextLine(); String nname = sc.nextLine();
+                    System.out.print("New Price: "); double nprice = sc.nextDouble();
+                    dao.updateProduct(new Product(uid, nname, nprice));
+                    break;
+                case 5:
+                    System.out.print("Id: "); int did = sc.nextInt();
+                    dao.deleteProduct(did);
+                    break;
+                case 6:
+                    System.exit(0);
+            }
+        }
+    }
+}
+
+//SQL Table Creation
+CREATE TABLE product (
+    id INT PRIMARY KEY,
+    name VARCHAR(50),
+    price DOUBLE
+);
+
+
+//Part c
+//Student Model
+public class Student {
+    private int id;
+    private String name;
+    private String grade;
+    
+    public Student() {}
+    public Student(int id, String name, String grade) {
+        this.id = id;
+        this.name = name;
+        this.grade = grade;
+    }
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public String getGrade() { return grade; }
+    public void setGrade(String grade) { this.grade = grade; }
+    @Override
+    public String toString() {
+        return "ID: " + id + ", Name: " + name + ", Grade: " + grade;
+    }
+}
+
+//JDBC Utility Class
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
+public class JDBCUtil {
+    static final String JDBC_URL = "jdbc:mysql://localhost:3306/your_db";
+    static final String USER = "root";
+    static final String PASS = "your_password";
+
+    public static Connection getConnection() throws SQLException {
+        return DriverManager.getConnection(JDBC_URL, USER, PASS);
+    }
+}
+
+//StudentDAO (JDBC CRUD)
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class StudentDAO {
+    public void addStudent(Student student) throws SQLException {
+        String sql = "INSERT INTO student (id, name, grade) VALUES (?, ?, ?)";
+        try (Connection con = JDBCUtil.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, student.getId());
+            ps.setString(2, student.getName());
+            ps.setString(3, student.getGrade());
+            ps.executeUpdate();
+        }
+    }
+
+    public List<Student> getAllStudents() throws SQLException {
+        List<Student> students = new ArrayList<>();
+        String sql = "SELECT * FROM student";
+        try (Connection con = JDBCUtil.getConnection();
+             Statement st = con.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) {
+                Student s = new Student(rs.getInt("id"), rs.getString("name"), rs.getString("grade"));
+                students.add(s);
+            }
+        }
+        return students;
+    }
+
+    public Student getStudentById(int id) throws SQLException {
+        String sql = "SELECT * FROM student WHERE id=?";
+        try (Connection con = JDBCUtil.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new Student(rs.getInt("id"), rs.getString("name"), rs.getString("grade"));
+                }
+            }
+        }
+        return null;
+    }
+
+    public void updateStudent(Student student) throws SQLException {
+        String sql = "UPDATE student SET name=?, grade=? WHERE id=?";
+        try (Connection con = JDBCUtil.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, student.getName());
+            ps.setString(2, student.getGrade());
+            ps.setInt(3, student.getId());
+            ps.executeUpdate();
+        }
+    }
+
+    public void deleteStudent(int id) throws SQLException {
+        String sql = "DELETE FROM student WHERE id=?";
+        try (Connection con = JDBCUtil.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            ps.executeUpdate();
+        }
+    }
+}
+
+//Controller (Main UI/Workflow)
+import java.util.Scanner;
+import java.util.List;
+
+public class StudentController {
+    public static void main(String[] args) throws Exception {
+        StudentDAO dao = new StudentDAO();
+        Scanner sc = new Scanner(System.in);
+        while (true) {
+            System.out.println("1. Add | 2. View All | 3. View by ID | 4. Update | 5. Delete | 6. Exit");
+            int choice = sc.nextInt();
+            switch (choice) {
+                case 1:
+                    System.out.print("ID: "); int id = sc.nextInt();
+                    System.out.print("Name: "); sc.nextLine(); String name = sc.nextLine();
+                    System.out.print("Grade: "); String grade = sc.next();
+                    dao.addStudent(new Student(id, name, grade));
+                    break;
+                case 2:
+                    List<Student> list = dao.getAllStudents();
+                    for (Student s : list) System.out.println(s);
+                    break;
+                case 3:
+                    System.out.print("ID: "); int sid = sc.nextInt();
+                    Student s = dao.getStudentById(sid);
+                    System.out.println(s != null ? s : "Not found");
+                    break;
+                case 4:
+                    System.out.print("ID: "); int uid = sc.nextInt();
+                    System.out.print("New Name: "); sc.nextLine(); String nname = sc.nextLine();
+                    System.out.print("New Grade: "); String ngrade = sc.next();
+                    dao.updateStudent(new Student(uid, nname, ngrade));
+                    break;
+                case 5:
+                    System.out.print("ID: "); int did = sc.nextInt();
+                    dao.deleteStudent(did);
+                    break;
+                case 6:
+                    System.exit(0);
+            }
+        }
+    }
+}
+
+//SQL Table Example
+CREATE TABLE student (
+    id INT PRIMARY KEY,
+    name VARCHAR(50),
+    grade VARCHAR(5)
+);
